@@ -39,7 +39,7 @@ const VirtualIP = "169.254.20.10"
 
 const (
 	image                    = "k8s.gcr.io/k8s-dns-node-cache"
-	tag                      = "1.15.12"
+	tag                      = "1.15.13"
 	componentLabel           = "nodelocaldns"
 	dnscacheCorefileTemplate = `
 __PILLAR__DNS__DOMAIN__:53 {
@@ -187,6 +187,10 @@ func dnscacheDaemonSet() *appsv1.DaemonSet {
 	trueBool := true
 	hostPathFileOrCreate := corev1.HostPathFileOrCreate
 	terminationGracePeriodSeconds := int64(0)
+	execScript := fmt.Sprintf(`
+sleep 10;
+exec /node-cache -localip %s -conf /etc/Corefile -upstreamsvc kube-dns-upstream`,
+		VirtualIP)
 
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -225,13 +229,10 @@ func dnscacheDaemonSet() *appsv1.DaemonSet {
 						{
 							Name:  "node-cache",
 							Image: fmt.Sprintf("%s:%s", image, tag),
-							Args: []string{
-								"-localip",
-								VirtualIP,
-								"-conf",
-								"/etc/Corefile",
-								"-upstreamsvc",
-								"kube-dns-upstream",
+							Command: []string{
+								"/bin/sh",
+								"-c",
+								execScript,
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
